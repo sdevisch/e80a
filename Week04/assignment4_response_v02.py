@@ -80,8 +80,32 @@ def transform_dataset(string, x_train, x_test, transformation_type):
     if string is "computer_vision":
         if transformation_type is "none":
             print("not applying any transformations")
+        if transformation_type is "rotate":
+            print("adding rotated pictures")
+            x_train = rotate_array(x_train)
+            x_test = rotate_array(x_test)
+        if transformation_type is "zoom":
+            print("adding zoomed pictures")
+            x_train = zoom_array(x_train)
+            x_test = zoom_array(x_test)
+        if transformation_type is "translate":
+            print("adding translated pictures")
+            x_train = move_array(x_train)
+            x_test = move_array(x_test)
+        if transformation_type is "all":
+            print("adding all transformations to pictures")
+            x_train = rotate_array(x_train)
+            x_test = rotate_array(x_test)
+            x_train = zoom_array(x_train)
+            x_test = zoom_array(x_test)
+            x_train = move_array(x_train)
+            x_test = move_array(x_test)
+        # make sure each pixel has a value
+        x_train = add_padding(x_train)
+        x_test = add_padding(x_test)
     else:
         print("not implemented yet")
+
 
     return (x_train, x_test)
 
@@ -130,7 +154,7 @@ def main():
     epochs = 100
     batch_size = 50
     learning_rate = [0.001]
-    transformation_type = "none"
+    transformation_type = "rotate"
 
 
     # Dataset : "computer_vision" or "speech_recognition"
@@ -162,12 +186,9 @@ def main():
                                     y_train, x_test, y_test)
 
         # Save model to h5 file
-        trained_model.save('models/model_%s_a4.h5' % dataset)
+        # trained_model.save('models/model_%s_a4.h5' % dataset)
 
     return None
-
-if __name__ == '__main__':
-    main()
 
 ######################DATA AUGMENTATION FUNCTIONS###############################
 ################################################################################
