@@ -1,11 +1,18 @@
-# dense network with multiple transformations in one dataset
 import os
 import sys
 import numpy as np
+from tensorflow import keras
 from tensorflow.keras import models, layers, callbacks
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.datasets import mnist
+
+# Change this to the location of the database directories
+DB_DIR = os.path.dirname(os.path.realpath("/Users/stevendevisch/E80a/installation_guide"))
+print(DB_DIR)
+# Import databases
+sys.path.insert(1, DB_DIR)
+# from db_utils import get_imdb_dataset, get_speech_dataset
 
 def Secure_Voice_Channel(func):
     """Define Secure_Voice_Channel decorator."""
@@ -19,18 +26,20 @@ def Secure_Voice_Channel(func):
     return execute_func
 
 @Secure_Voice_Channel
-def generic_vns_function(input_dim, number_dense_layers, classes, units, lr):
+def generic_vns_function(input_dim, number_dense_layers, classes, lr):
     """Generic Deep Learning Model generator."""
-    model = models.Sequential()
-    #TODO: Add a Convolutional Layer
-    #TODO: Add a MaxPool2D layer
-    #TODO: Add a Flatten Layer
-    for i in range(number_dense_layers):
-        model.add(layers.Dense(units=units, input_dim=input_dim,
-                  kernel_initializer='normal', activation='relu'))
-
-    model.add(layers.Dense(classes, kernel_initializer='normal',
-              activation='softmax'))
+    model = models.Sequential(
+    [
+        keras.Input(shape=input_dim),
+        layers.Conv2D(32, kernel_size=(3, 3), activation="relu"),
+        layers.MaxPooling2D(pool_size=(2, 2)),
+        layers.Conv2D(64, kernel_size=(3, 3), activation="relu"),
+        layers.MaxPooling2D(pool_size=(2, 2)),
+        layers.Flatten(),
+        layers.Dropout(0.5),
+        layers.Dense(classes, activation="softmax"),
+    ]
+    )
     opt = Adam(lr=lr)
     model.compile(loss='categorical_crossentropy', optimizer=opt,
                   metrics=['accuracy'])
@@ -47,12 +56,12 @@ def train_model(model, epochs, batch_size, x_train, y_train, x_test, y_test):
 
     return model
 
-def choose_dataset(dataset_type, transformation_type):
+def choose_dataset(dataset_type, transformation_type="none"):
     """Select dataset based on string variable."""
     if dataset_type == "nlp":
         return get_imdb_dataset(dir=DB_DIR)
     elif dataset_type == "computer_vision":
-        (x_train, y_train), (x_test, y_test) = mnist.load_data()
+        (x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
     elif dataset_type == "speech_recognition":
         (x_train, y_train), (x_test, y_test), (_, _) = get_speech_dataset()
     else:
@@ -100,16 +109,22 @@ def transform_dataset(string, x_train, x_test, transformation_type):
 
     return (x_train, x_test)
 
+
 def normalize_dataset(string, x_train, x_test):
     """Normalize speech recognition and computer vision datasets."""
     if string is "computer_vision":
-        x_train = x_train / 255
-        x_test = x_test / 255
+        x_train = x_train.astype("float32") / 255
+        x_test = x_test.astype("float32") / 255
+        # Make sure images have shape (28, 28, 1)
+        x_train = np.expand_dims(x_train, -1)
+        x_test = np.expand_dims(x_test, -1)
     else:
         mean = np.mean(x_train)
         std = np.std(x_train)
         x_train = (x_train-std)/mean
         x_test = (x_test-std)/mean
+        x_train = np.expand_dims(x_train, -1)
+        x_test = np.expand_dims(x_test, -1)
 
     return (x_train, x_test)
 
@@ -119,28 +134,29 @@ def reshape_dataset(x_train, y_train, x_test, y_test):
     num_pixels = x_test.shape[1]*x_test.shape[2]
 
     # TODO: Change Reshape Function to the format (num_samples, x_axis, y_axis, channels)
-    x_test = x_test.reshape(x_test.shape[0], num_pixels).astype('float32')
-    x_train = x_train.reshape(x_train.shape[0], num_pixels).astype('float32')
+    #x_test = x_test.reshape(x_test.shape[0], num_pixels).astype('float32')
+    #x_train = x_train.reshape(x_train.shape[0], num_pixels).astype('float32')
 
     y_train = to_categorical(y_train)
     y_test = to_categorical(y_test)
 
     return (x_train, y_train), (x_test, y_test)
 
+
 def main():
 
     # Hyperparameters
-    layers = 3
-    layer_units = 1000
+    # layers = 1
+    # layer_units = 1000
+    # Final hyperparameters
     epochs = 100
-    batch_size = 200
-    lr = 0.0001
+    batch_size = 50
+    # learning_rate = [1, 0.1, 0.001, 0.0001, 0.00001]
+    learning_rate = [0.001]
     #transformation_types : "rotate" or "zoom" or "translate" or "none" or "all"
-    base_transformation_type = "none"
-    additional_transformation_types = ["rotate","zoom","translate"]
-
+    transformation_type = "all"
     # nr of times the dataset is duplicated
-    duplicate_dataset_x_times = 0
+    duplicate_dataset_x_times = 1
 
     # Dataset : "computer_vision" or "speech_recognition"
     dataset = "computer_vision"
@@ -148,22 +164,36 @@ def main():
 
     # printing basic info about the dataset
     # Model / data parameters
-    (x_train, y_train), (x_test, y_test) = choose_dataset(dataset, base_transformation_type)
-    for transformation_type in additional_transformation_types:
+    (x_train, y_train), (x_test, y_test) = choose_dataset(dataset, transformation_type)
+    for _ in duplicate_dataset_x_times:
       (x_train2, y_train2), (x_test2, y_test2) = choose_dataset(dataset, transformation_type)
       x_train = np.concatenate((x_train,x_train2), axis=0)
       y_train = np.concatenate((y_train,y_train2), axis=0)
       x_test = np.concatenate((x_test,x_test2), axis=0)
       y_test = np.concatenate((y_test,y_test2), axis=0)
 
+    print("dataset with load data:", dataset)
+    print("x_train shape:", x_train.shape)
+    print("y_train shape:", y_train.shape)
+    print(x_train.shape[0], "train samples")
+    print(x_test.shape[0], "test samples")
 
     # Generate and train model
     # TODO: Change inputs to generic_vns_function
-    model = generic_vns_function(x_train.shape[1], layers, y_train.shape[1], layer_units, lr)
-    trained_model = train_model(model, epochs, batch_size, x_train, y_train, x_test, y_test)
+    # model = generic_vns_function(x_train.shape[1], layers, y_train.shape[1], layer_units, lr)
 
-    # Save model to h5 file
-    # trained_model.save('models/model_%s_a3.h5' % dataset)
+    nr_of_classes = y_train.shape[1]
+    # Loop over several learning rates
+    for lr in learning_rate:
+        # Generate and train model
+        model = generic_vns_function((x_train.shape[1], x_train.shape[2],
+                                    x_train.shape[3]), layers, nr_of_classes, lr)
+        # def generic_vns_function(input_dim, number_dense_layers, classes, units, lr):
+        trained_model = train_model(model, epochs, batch_size, x_train,
+                                    y_train, x_test, y_test)
+
+        # Save model to h5 file
+        # trained_model.save('models/model_%s_a4.h5' % dataset)
 
     return None
 
@@ -186,7 +216,7 @@ def add_padding(X, padding=10):
         new_X.append(new_image)
     return np.asarray(new_X)
 
-def move_array(X, transform_range=5):
+def move_array(X, transform_range=60):
     """Transform X (image array) with a random move within range."""
     new_X = []
     for img in X:
@@ -198,7 +228,7 @@ def move_array(X, transform_range=5):
 
     return np.asarray(new_X)
 
-def rotate_array(X, angle_range=15):
+def rotate_array(X, angle_range=60):
     """Rotate X (image array) with a random angle within angle range."""
     new_X = []
     for img in X:
