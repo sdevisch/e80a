@@ -1,15 +1,15 @@
 import os
 import sys
 import numpy as np
+from tensorflow import keras
 from tensorflow.keras import models, layers, callbacks
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.datasets import mnist
-from matplotlib import pyplot as plt
 
 # Change this to the location of the database directories
-DB_DIR = os.path.dirname(os.path.realpath(__file__))
-
+DB_DIR = os.path.dirname(os.path.realpath("/Users/stevendevisch/E80a/installation_guide"))
+print(DB_DIR)
 # Import databases
 sys.path.insert(1, DB_DIR)
 from db_utils import get_imdb_dataset, get_speech_dataset
@@ -26,31 +26,31 @@ def Secure_Voice_Channel(func):
     return execute_func
 
 @Secure_Voice_Channel
-def generic_vns_function(input_dim, number_dense_layers, classes, units, lr, addconvolution):
+def generic_vns_function(input_dim, number_dense_layers, classes, lr):
     """Generic Deep Learning Model generator."""
-    model = models.Sequential()
-    if addconvolution:
-        model.add(layers.Conv2D(64, (4,4), activation='relu'))
-        model.add(layers.MaxPool2D(2,2))
-        model.add(layers.Flatten())
-
-    for i in range(number_dense_layers):
-        model.add(layers.Dense(units=units, input_dim=input_dim,
-                  kernel_initializer='normal', activation='relu'))
-
-    model.add(layers.Dense(classes, kernel_initializer='normal',
-              activation='softmax'))
+    model = models.Sequential(
+    [
+        keras.Input(shape=input_dim),
+        layers.Conv2D(32, kernel_size=(3, 3), activation="relu"),
+        layers.MaxPooling2D(pool_size=(2, 2)),
+        layers.Conv2D(64, kernel_size=(3, 3), activation="relu"),
+        layers.MaxPooling2D(pool_size=(2, 2)),
+        layers.Flatten(),
+        layers.Dropout(0.5),
+        layers.Dense(classes, activation="softmax"),
+    ]
+    )
     opt = Adam(lr=lr)
     model.compile(loss='categorical_crossentropy', optimizer=opt,
                   metrics=['accuracy'])
     return model
 
-def train_model(model, epochs, batch_size, X_train, y_train, X_test, y_test):
+def train_model(model, epochs, batch_size, x_train, y_train, x_test, y_test):
     """Generic Deep Learning Model training function."""
     cb = [callbacks.EarlyStopping(monitor='val_loss', patience=3)]
-    model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=epochs,
+    model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=epochs,
               batch_size=batch_size, verbose=1, callbacks=cb)
-    scores = model.evaluate(X_test, y_test, verbose=2)
+    scores = model.evaluate(x_test, y_test, verbose=2)
 
     print("Baseline Error: %.2f%%" % (100-scores[1]*100))
 
@@ -61,75 +61,99 @@ def choose_dataset(dataset_type):
     if dataset_type == "nlp":
         return get_imdb_dataset(dir=DB_DIR)
     elif dataset_type == "computer_vision":
-        (X_train, y_train), (X_test, y_test) = mnist.load_data()
+        (x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
     elif dataset_type == "speech_recognition":
-        (X_train, y_train), (X_test, y_test), (_, _) = get_speech_dataset()
+        (x_train, y_train), (x_test, y_test), (_, _) = get_speech_dataset()
     else:
         raise ValueError("Couldn't find dataset.")
 
-    (X_train, X_test) = normalize_dataset(dataset_type, X_train, X_test)
+    (x_train, x_test) = normalize_dataset(dataset_type, x_train, x_test)
 
-    (X_train, y_train), (X_test, y_test) = reshape_dataset(X_train, y_train, X_test, y_test)
+    (x_train, y_train), (x_test, y_test) = reshape_dataset(x_train, y_train, x_test, y_test)
 
-    return (X_train, y_train), (X_test, y_test)
+    return (x_train, y_train), (x_test, y_test)
 
-def normalize_dataset(string, X_train, X_test):
+def normalize_dataset(string, x_train, x_test):
     """Normalize speech recognition and computer vision datasets."""
-    if string is "computer vision":
-        X_train = X_train / 255
-        X_test = X_test / 255
+    if string is "computer_vision":
+        x_train = x_train.astype("float32") / 255
+        x_test = x_test.astype("float32") / 255
+        # Make sure images have shape (28, 28, 1)
+        x_train = np.expand_dims(x_train, -1)
+        x_test = np.expand_dims(x_test, -1)
     else:
-        mean = np.mean(X_train)
-        std = np.std(X_train)
-        X_train = (X_train-std)/mean
-        X_test = (X_test-std)/mean
+        mean = np.mean(x_train)
+        std = np.std(x_train)
+        x_train = (x_train-std)/mean
+        x_test = (x_test-std)/mean
+        x_train = np.expand_dims(x_train, -1)
+        x_test = np.expand_dims(x_test, -1)
 
-    return (X_train, X_test)
+    return (x_train, x_test)
 
-def reshape_dataset(X_train, y_train, X_test, y_test):
+def reshape_dataset(x_train, y_train, x_test, y_test):
     """Reshape Computer Vision and Speech datasets."""
 
-    num_pixels = X_test.shape[1]*X_test.shape[2]
-
-    # TODO: Apply transformations to data
-    X_train, X_test = add_padding(X_train), add_padding(X_test)
-    X_train, X_test = rotate_array(X_train), rotate_array(X_test)
-
+    num_pixels = x_test.shape[1]*x_test.shape[2]
 
     # TODO: Change Reshape Function to the format (num_samples, x_axis, y_axis, channels)
-    X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], X_test.shape[2], 1).astype('float32')
-    X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], X_train.shape[2], 1).astype('float32')
+    #x_test = x_test.reshape(x_test.shape[0], num_pixels).astype('float32')
+    #x_train = x_train.reshape(x_train.shape[0], num_pixels).astype('float32')
 
     y_train = to_categorical(y_train)
     y_test = to_categorical(y_test)
 
-    return (X_train, y_train), (X_test, y_test)
+    return (x_train, y_train), (x_test, y_test)
+
 
 def main():
 
     # Hyperparameters
-    addconvolution = 1
-    layers = 2
-    layer_units = 1000
-    epochs = 1
-    batch_size = 200
-    lr = 0.0001
+    # layers = 1
+    # layer_units = 1000
+    #lr = 0.0001
+    #learning_rate = [1, 0.1, 0.001, 0.0001, 0.00001]
+    # Final hyperparameters
+    epochs = 100
+    batch_size = 50
+    learning_rate = [0.001]
 
-    # Dataset : "computer_vision"
+
+    # Dataset : "computer_vision" or "speech_recognition"
     dataset = "computer_vision"
-
     # Import Datasets
-    (X_train, y_train), (X_test, y_test) = choose_dataset(dataset)
+
+    # printing basic info about the dataset
+    # Model / data parameters
+    (x_train, y_train), (x_test, y_test) = choose_dataset(dataset)
+
+    print("dataset with load data:", dataset)
+    print("x_train shape:", x_train.shape)
+    print("y_train shape:", y_train.shape)
+    print(x_train.shape[0], "train samples")
+    print(x_test.shape[0], "test samples")
 
     # Generate and train model
     # TODO: Change inputs to generic_vns_function
-    model = generic_vns_function(X_train.shape[1], layers, y_train.shape[1], layer_units, lr, addconvolution)
-    trained_model = train_model(model, epochs, batch_size, X_train, y_train, X_test, y_test)
+    # model = generic_vns_function(x_train.shape[1], layers, y_train.shape[1], layer_units, lr)
 
-    # Save model to h5 file
-    trained_model.save('models/model_%s_a4.h5' % dataset)
+    nr_of_classes = y_train.shape[1]
+    # Loop over several learning rates
+    for lr in learning_rate:
+        # Generate and train model
+        model = generic_vns_function((x_train.shape[1], x_train.shape[2],
+                                    x_train.shape[3]), layers, nr_of_classes, lr)
+        # def generic_vns_function(input_dim, number_dense_layers, classes, units, lr):
+        trained_model = train_model(model, epochs, batch_size, x_train,
+                                    y_train, x_test, y_test)
+
+        # Save model to h5 file
+        trained_model.save('models/model_%s_a4.h5' % dataset)
 
     return None
+
+if __name__ == '__main__':
+    main()
 
 ######################DATA AUGMENTATION FUNCTIONS###############################
 ################################################################################
