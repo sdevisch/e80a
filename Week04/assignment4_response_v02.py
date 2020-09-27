@@ -56,7 +56,7 @@ def train_model(model, epochs, batch_size, x_train, y_train, x_test, y_test):
 
     return model
 
-def choose_dataset(dataset_type):
+def choose_dataset(dataset_type, transformation_type="none"):
     """Select dataset based on string variable."""
     if dataset_type == "nlp":
         return get_imdb_dataset(dir=DB_DIR)
@@ -67,11 +67,24 @@ def choose_dataset(dataset_type):
     else:
         raise ValueError("Couldn't find dataset.")
 
+    (x_train, x_test) = transform_dataset(dataset_type, x_train, x_test, transformation_type)
+
     (x_train, x_test) = normalize_dataset(dataset_type, x_train, x_test)
 
     (x_train, y_train), (x_test, y_test) = reshape_dataset(x_train, y_train, x_test, y_test)
 
     return (x_train, y_train), (x_test, y_test)
+
+def transform_dataset(string, x_train, x_test, transformation_type):
+    """Normalize speech recognition and computer vision datasets."""
+    if string is "computer_vision":
+        if transformation_type is "none":
+            print("not applying any transformations")
+    else:
+        print("not implemented yet")
+
+    return (x_train, x_test)
+
 
 def normalize_dataset(string, x_train, x_test):
     """Normalize speech recognition and computer vision datasets."""
@@ -117,6 +130,7 @@ def main():
     epochs = 100
     batch_size = 50
     learning_rate = [0.001]
+    transformation_type = "none"
 
 
     # Dataset : "computer_vision" or "speech_recognition"
@@ -125,7 +139,7 @@ def main():
 
     # printing basic info about the dataset
     # Model / data parameters
-    (x_train, y_train), (x_test, y_test) = choose_dataset(dataset)
+    (x_train, y_train), (x_test, y_test) = choose_dataset(dataset, transformation_type)
 
     print("dataset with load data:", dataset)
     print("x_train shape:", x_train.shape)
