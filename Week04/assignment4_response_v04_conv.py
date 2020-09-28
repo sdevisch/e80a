@@ -1,3 +1,4 @@
+# convolutional network with option to train and test on different datasets
 import os
 import sys
 import numpy as np
@@ -154,9 +155,16 @@ def main():
     # learning_rate = [1, 0.1, 0.001, 0.0001, 0.00001]
     learning_rate = [0.001]
     #transformation_types : "rotate" or "zoom" or "translate" or "none" or "all"
-    transformation_type = "all"
+    # empty these transformation types if you only want to do one
+    base_transformation_type = "none"
+    # set to "" to test and train data on the same dataset
+    test_transformation_type = "rotate"
+    additional_transformation_types = []
+    # additional_transformation_types = ["rotate","zoom","translate"]
+
+
     # nr of times the dataset is duplicated
-    duplicate_dataset_x_times = 1
+    duplicate_dataset_x_times = 0
 
     # Dataset : "computer_vision" or "speech_recognition"
     dataset = "computer_vision"
@@ -164,13 +172,23 @@ def main():
 
     # printing basic info about the dataset
     # Model / data parameters
-    (x_train, y_train), (x_test, y_test) = choose_dataset(dataset, transformation_type)
-    for _ in duplicate_dataset_x_times:
+    (x_train, y_train), (x_test, y_test) = choose_dataset(dataset, base_transformation_type)
+
+    # applying additional transformation types
+    for transformation_type in additional_transformation_types:
       (x_train2, y_train2), (x_test2, y_test2) = choose_dataset(dataset, transformation_type)
       x_train = np.concatenate((x_train,x_train2), axis=0)
       y_train = np.concatenate((y_train,y_train2), axis=0)
       x_test = np.concatenate((x_test,x_test2), axis=0)
       y_test = np.concatenate((y_test,y_test2), axis=0)
+
+    if test_transformation_type is not "":
+      print("testing on transformed data with this tranformation: ", test_transformation_type)
+      # apply the test_transformation_type
+      (x_train2, y_train2), (x_test2, y_test2) = choose_dataset(dataset, test_transformation_type)
+      # keep training data as-is, and score the model on transformed data
+      x_test = x_test2
+      y_test = y_test2
 
     print("dataset with load data:", dataset)
     print("x_train shape:", x_train.shape)
@@ -216,7 +234,7 @@ def add_padding(X, padding=10):
         new_X.append(new_image)
     return np.asarray(new_X)
 
-def move_array(X, transform_range=60):
+def move_array(X, transform_range=5):
     """Transform X (image array) with a random move within range."""
     new_X = []
     for img in X:
@@ -228,7 +246,7 @@ def move_array(X, transform_range=60):
 
     return np.asarray(new_X)
 
-def rotate_array(X, angle_range=60):
+def rotate_array(X, angle_range=15):
     """Rotate X (image array) with a random angle within angle range."""
     new_X = []
     for img in X:
